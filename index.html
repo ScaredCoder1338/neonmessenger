@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeoGram • Modern Messenger</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --dark-bg: #0f172a;
+            --sidebar-bg: #1e293b;
+            --chat-bg: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border-color: #334155;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
+            --border-radius: 12px;
+            --border-radius-sm: 8px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Стили для скрытия элементов */
+        .hidden {
+            display: none !important;
+        }
+        
+        .auth-visible #mainApp,
+        .app-visible #authModal {
+            display: none !important;
+        }
+        
+        .auth-visible #authModal {
+            display: flex !important;
+        }
+        
+        .app-visible #mainApp {
+            display: flex !important;
+        }
+        
+        /* Стили для модального окна авторизации */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 420px;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        @keyframes modalSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .modal-header {
+            padding: 40px 40px 20px;
+            text-align: center;
+            background: var(--primary-gradient);
+            position: relative;
+        }
+        
+        .modal-header h2 {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        
+        .modal-subtitle {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            font-weight: 400;
+        }
+        
+        .modal-body {
+            padding: 40px;
+        }
+        
+        /* Основной контейнер приложения */
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+            background: var(--dark-bg);
+            overflow: hidden;
+        }
+        
+        /* Боковая панель */
+        .sidebar {
+            width: 380px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+        }
+        
+        .sidebar-header {
+            padding: 24px 20px;
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        
+        .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .user-avatar {
+            background: var(--primary-gradient);
+            border: 3px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .avatar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+        }
+        
+        .user-info h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .user-status {
+            font-size: 13px;
+            color: var(--success);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .user-status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-new-chat, .btn-logout {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-new-chat::before, .btn-logout::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .btn-new-chat:hover, .btn-logout:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .btn-new-chat:hover::before, .btn-logout:hover::before {
+            opacity: 1;
+        }
+        
+        /* Поиск */
+        .search-box {
+            padding: 20px;
+            position: relative;
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 36px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 14px;
+            z-index: 2;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 14px 20px 14px 44px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 400;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            background: rgba(30, 41, 59, 0.8);
+        }
+        
+        .search-box input::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        /* Список чатов */
+        .chats-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent) var(--sidebar-bg);
+        }
+        
+        .chats-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chats-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .chats-list::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 3px;
+        }
+        
+        .chat-item {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            border-radius: 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chat-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .chat-item:hover {
+            background: rgba(30, 41, 59, 0.6);
+        }
+        
+        .chat-item:hover::before {
+            opacity: 1;
+        }
+        
+        .chat-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .chat-avatar {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: var(--secondary-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            margin-right: 16px;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chat-avatar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+        }
+        
+        .chat-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        
+        .chat-header h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .chat-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+        
+        .chat-preview {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-preview p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            margin: 0;
+        }
+        
+        .unread-count {
+            background: var(--accent);
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 8px;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Текущий пользователь */
+        .current-user {
+            padding: 20px;
+            background: rgba(30, 41, 59, 0.9);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .current-user .avatar {
+            width: 40px;
+            height: 40px;
+            background: var(--primary-gradient);
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .username {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .status {
+            font-size: 12px;
+            color: var(--success);
+            font-weight: 500;
+        }
+        
+        .btn-settings {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-settings:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transform: rotate(30deg);
+        }
+        
+        /* Основная область чата */
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--chat-bg);
+            position: relative;
+        }
+        
+        .chat-header {
+            padding: 20px 28px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 5;
+        }
+        
+        .chat-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .chat-info .avatar {
+            width: 44px;
+            height: 44px;
+            background: var(--secondary-gradient);
+        }
+        
+        .chat-info h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .chat-status {
+            font-size: 13px;
+            color: var(--success);
+            font-weight: 500;
+        }
+        
+        .chat-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-action {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-action::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .btn-action:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transform: translateY(-2px);
+        }
+        
+        .btn-action:hover::before {
+            opacity: 1;
+        }
+        
+        /* Область сообщений */
+        .messages-area {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .welcome-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            text-align: center;
+            background: var(--chat-bg);
+            z-index: 1;
+        }
+        
+        .welcome-icon {
+            width: 96px;
+            height: 96px;
+            background: var(--primary-gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 40px;
+            margin-bottom: 32px;
+            position: relative;
+            overflow: hidden;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .welcome-icon::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .welcome-screen h2 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+        
+        .welcome-screen p {
+            color: var(--text-secondary);
+            font-size: 15px;
+            line-height: 1.6;
+            max-width: 400px;
+            margin: 0 auto 12px;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 32px 0;
+            padding: 16px 24px;
+            background: rgba(30, 41, 59, 0.6);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            position: relative;
+        }
+        
+        .status-indicator.connecting {
+            background: var(--warning);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        .status-indicator.connecting::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border: 2px solid var(--warning);
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: pulse-ring 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+        
+        .btn-connect {
+            padding: 16px 32px;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-connect::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .btn-connect:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+        
+        .btn-connect:hover::before {
+            opacity: 1;
+        }
+        
+        /* Панель ввода сообщения */
+        .message-input-area {
+            padding: 24px 28px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 5;
+        }
+        
+        .input-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-attach, .btn-emoji {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-attach:hover, .btn-emoji:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transform: scale(1.1);
+        }
+        
+        .message-input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+        
+        .message-input-wrapper input {
+            width: 100%;
+            padding: 16px 52px 16px 24px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 50px;
+            color: var(--text-primary);
+            font-size: 15px;
+            font-weight: 400;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .message-input-wrapper input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            background: rgba(30, 41, 59, 0.8);
+        }
+        
+        .message-input-wrapper input::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        .btn-send {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: none;
+            background: var(--accent);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-send:hover {
+            background: var(--accent-hover);
+            transform: translateY(-50%) scale(1.1);
+        }
+        
+        .btn-voice {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary-gradient);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-voice::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .btn-voice:hover {
+            transform: scale(1.1);
+        }
+        
+        .btn-voice:hover::before {
+            opacity: 1;
+        }
+        
+        /* Панель информации о чате */
+        .chat-info-panel {
+            width: 320px;
+            background: var(--sidebar-bg);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+        }
+        
+        .info-header {
+            padding: 28px 24px;
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .info-header h3 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .btn-close-info {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-close-info:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transform: rotate(90deg);
+        }
+        
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .sidebar {
+                width: 320px;
+            }
+            
+            .chat-info-panel {
+                width: 280px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+            }
+            
+            .chat-info-panel {
+                position: fixed;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                z-index: 20;
+            }
+            
+            .main-chat.active {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body class="auth-visible">
+    <!-- Модальное окно авторизации -->
+    <div class="modal" id="authModal">
+        <!-- Шаг 1: Ввод номера телефона -->
+        <div class="modal-content auth-modal" id="phoneStep">
+            <div class="modal-header">
+                <div class="decorative-dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+                <h2>NeoGram</h2>
+                <p class="modal-subtitle">Modern & Secure Messenger</p>
+            </div>
+            <div class="modal-body">
+                <div class="auth-form">
+                    <div class="phone-input-container">
+                        <label for="phoneNumber" class="input-label">Номер телефона</label>
+                        <div class="phone-input-wrapper">
+                            <div class="country-selector">
+                                <div class="selected-country">
+                                    <span class="country-flag">🇷🇺</span>
+                                    <span class="country-code">+7</span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                            </div>
+                            <input type="tel" id="phoneNumber" placeholder="900 123 45 67" maxlength="15">
+                        </div>
+                        <small class="form-hint">На этот номер будет отправлен код подтверждения</small>
+                    </div>
+                    
+                    <div class="terms-agreement">
+                        <input type="checkbox" id="termsAgreement">
+                        <label for="termsAgreement">
+                            Я соглашаюсь с <a href="#" class="terms-link">Условиями использования</a> и 
+                            <a href="#" class="terms-link">Политикой конфиденциальности</a>
+                        </label>
+                    </div>
+                    
+                    <button class="btn-next" id="sendCodeBtn">
+                        <span>Продолжить</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    
+                    <div class="auth-info">
+                        <p><i class="fas fa-shield-alt"></i> Ваши данные защищены</p>
+                        <p><i class="fas fa-mobile-alt"></i> СМС бесплатно</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Шаг 2: Ввод кода подтверждения -->
+        <div class="modal-content auth-modal hidden" id="codeStep">
+            <div class="modal-header">
+                <div class="back-btn" id="backToPhone">
+                    <i class="fas fa-arrow-left"></i>
+                </div>
+                <h2>Подтверждение</h2>
+                <p class="modal-subtitle" id="codeSentTo">Код отправлен на +7 900 123 45 67</p>
+            </div>
+            <div class="modal-body">
+                <div class="auth-form">
+                    <div class="code-input-container">
+                        <label class="input-label">Введите код из СМС</label>
+                        <div class="code-inputs">
+                            <input type="text" class="code-digit" maxlength="1" data-index="1">
+                            <input type="text" class="code-digit" maxlength="1" data-index="2">
+                            <input type="text" class="code-digit" maxlength="1" data-index="3">
+                            <input type="text" class="code-digit" maxlength="1" data-index="4">
+                            <input type="text" class="code-digit" maxlength="1" data-index="5">
+                        </div>
+                        <small class="form-hint">Введите 5-значный код</small>
+                        
+                        <div class="timer" id="resendTimer">
+                            <i class="fas fa-clock"></i>
+                            <span id="timerText">01:00</span>
+                        </div>
+                        
+                        <button class="btn-resend hidden" id="resendCodeBtn">
+                            <i class="fas fa-redo"></i>
+                            Отправить код повторно
+                        </button>
+                    </div>
+                    
+                    <button class="btn-verify" id="verifyCodeBtn" disabled>
+                        <span>Подтвердить</span>
+                        <i class="fas fa-check"></i>
+                    </button>
+                    
+                    <div class="auth-info">
+                        <p><i class="fas fa-info-circle"></i> Код действует 5 минут</p>
+                        <p><i class="fas fa-sync-alt"></i> Если код не пришел, проверьте номер</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Шаг 3: Профиль -->
+        <div class="modal-content auth-modal hidden" id="profileStep">
+            <div class="modal-header">
+                <h2>Создание профиля</h2>
+                <p class="modal-subtitle">Завершите настройку профиля</p>
+            </div>
+            <div class="modal-body">
+                <div class="auth-form">
+                    <div class="avatar-upload">
+                        <div class="avatar-preview" id="avatarPreview">
+                            <i class="fas fa-user"></i>
+                            <div class="avatar-overlay">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                        </div>
+                        <input type="file" id="avatarInput" accept="image/*" hidden>
+                        <button class="btn-change-avatar" id="changeAvatarBtn">
+                            Изменить фото профиля
+                        </button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="firstName" class="input-label">Имя</label>
+                        <input type="text" id="firstName" placeholder="Введите ваше имя" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lastName" class="input-label">Фамилия (опционально)</label>
+                        <input type="text" id="lastName" placeholder="Введите вашу фамилию">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="username" class="input-label">Имя пользователя</label>
+                        <div class="username-input">
+                            <span class="username-prefix">@</span>
+                            <input type="text" id="username" placeholder="username" maxlength="32">
+                        </div>
+                        <small class="form-hint">По этому имени вас смогут найти другие пользователи</small>
+                    </div>
+                    
+                    <button class="btn-complete" id="completeProfileBtn">
+                        <span>Завершить настройку</span>
+                        <i class="fas fa-rocket"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Основной интерфейс мессенджера -->
+    <div class="container hidden" id="mainApp">
+        <div class="sidebar">
+            <!-- Заголовок боковой панели -->
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <div class="avatar user-avatar" id="userAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h3 id="userDisplayName">Алексей Иванов</h3>
+                        <span class="user-status" id="userStatus">online</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-new-chat" id="newChatBtn" title="Новый чат">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-logout" id="logoutBtn" title="Выйти">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Поиск -->
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Поиск чатов..." id="searchInput">
+            </div>
+            
+            <!-- Список чатов -->
+            <div class="chats-list" id="chatsList">
+                <div class="chat-item active" data-chat-id="1">
+                    <div class="chat-avatar">
+                        <i class="fas fa-headset"></i>
+                    </div>
+                    <div class="chat-info">
+                        <div class="chat-header">
+                            <h4>Техническая поддержка</h4>
+                            <span class="chat-time">10:30</span>
+                        </div>
+                        <div class="chat-preview">
+                            <p>Чем могу помочь?</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-item" data-chat-id="2">
+                    <div class="chat-avatar">
+                        <i class="fas fa-user-friends"></i>
+                    </div>
+                    <div class="chat-info">
+                        <div class="chat-header">
+                            <h4>Друзья</h4>
+                            <span class="chat-time">Вчера</span>
+                        </div>
+                        <div class="chat-preview">
+                            <p>Встречаемся в 19:00</p>
+                            <span class="unread-count">2</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Информация о текущем пользователе -->
+            <div class="current-user">
+                <div class="avatar small">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-details">
+                    <span class="username">@alexey</span>
+                    <span class="status online">online</span>
+                </div>
+                <button class="btn-settings" title="Настройки">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Основная область чата -->
+        <div class="main-chat">
+            <!-- Заголовок чата -->
+            <div class="chat-header">
+                <div class="chat-info">
+                    <div class="avatar">
+                        <i class="fas fa-headset"></i>
+                    </div>
+                    <div>
+                        <h3 id="chatTitle">Техническая поддержка</h3>
+                        <span class="chat-status" id="chatStatus">online</span>
+                    </div>
+                </div>
+                <div class="chat-actions">
+                    <button class="btn-action" title="Поиск">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <button class="btn-action" title="Информация">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Область сообщений -->
+            <div class="messages-area" id="messagesArea">
+                <!-- Приветственное сообщение -->
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="welcome-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <h2>Добро пожаловать, Алексей!</h2>
+                    <p>Ваш номер: <strong>+7 900 123 45 67</strong></p>
+                    <p>Выберите чат из списка слева, чтобы начать общение</p>
+                    <div class="connection-status">
+                        <div class="status-indicator connecting"></div>
+                        <span>Подключение к серверу...</span>
+                    </div>
+                    <button class="btn-connect" id="connectBtn">
+                        <i class="fas fa-plug"></i> Подключиться
+                    </button>
+                </div>
+                
+                <!-- Сообщения чата (скрыто по умолчанию) -->
+                <div class="chat-messages hidden" id="chatMessages">
+                    <!-- Сообщения будут добавляться здесь -->
+                </div>
+            </div>
+            
+            <!-- Панель ввода сообщения -->
+            <div class="message-input-area hidden" id="messageInputArea">
+                <div class="input-actions">
+                    <button class="btn-attach" title="Прикрепить файл">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                    <button class="btn-emoji" title="Смайлики">
+                        <i class="fas fa-smile"></i>
+                    </button>
+                </div>
+                <div class="message-input-wrapper">
+                    <input type="text" 
+                           placeholder="Напишите сообщение..." 
+                           id="messageInput"
+                           disabled>
+                    <button class="btn-send" id="sendButton" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="voice-action">
+                    <button class="btn-voice" title="Голосовое сообщение">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Панель информации о чате -->
+        <div class="chat-info-panel hidden" id="chatInfoPanel">
+            <div class="info-header">
+                <h3>Информация о чате</h3>
+                <button class="btn-close-info" id="closeInfoBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="info-content">
+                <!-- Контент панели информации -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Добавляем дополнительные стили для инпутов авторизации
+        const style = document.createElement('style');
+        style.textContent = `
+            .input-label {
+                display: block;
+                margin-bottom: 8px;
+                color: var(--text-primary);
+                font-weight: 500;
+                font-size: 14px;
+            }
+            
+            .form-hint {
+                display: block;
+                margin-top: 8px;
+                color: var(--text-secondary);
+                font-size: 12px;
+                line-height: 1.4;
+            }
+            
+            .phone-input-wrapper {
+                display: flex;
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                overflow: hidden;
+                background: rgba(30, 41, 59, 0.6);
+                transition: all 0.2s;
+            }
+            
+            .phone-input-wrapper:focus-within {
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            }
+            
+            .country-selector {
+                position: relative;
+                min-width: 100px;
+                background: rgba(30, 41, 59, 0.8);
+                border-right: 1px solid var(--border-color);
+                display: flex;
+                align-items: center;
+                padding: 0 16px;
+                cursor: pointer;
+            }
+            
+            .selected-country {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: var(--text-primary);
+                font-weight: 500;
+            }
+            
+            .country-flag {
+                font-size: 20px;
+            }
+            
+            #phoneNumber {
+                flex: 1;
+                border: none;
+                background: transparent;
+                color: var(--text-primary);
+                padding: 16px;
+                font-size: 16px;
+                outline: none;
+            }
+            
+            #phoneNumber::placeholder {
+                color: var(--text-secondary);
+            }
+            
+            .terms-agreement {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                margin: 24px 0;
+                color: var(--text-secondary);
+                font-size: 14px;
+                line-height: 1.5;
+            }
+            
+            .terms-agreement input[type="checkbox"] {
+                margin-top: 3px;
+                accent-color: var(--accent);
+            }
+            
+            .terms-link {
+                color: var(--accent);
+                text-decoration: none;
+                transition: color 0.2s;
+            }
+            
+            .terms-link:hover {
+                text-decoration: underline;
+            }
+            
+            .btn-next, .btn-verify, .btn-complete {
+                width: 100%;
+                padding: 18px 24px;
+                background: var(--primary-gradient);
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                margin-top: 8px;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .btn-next::before, .btn-verify::before, .btn-complete::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+            
+            .btn-next:hover, .btn-verify:hover, .btn-complete:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            }
+            
+            .btn-next:hover::before, .btn-verify:hover::before, .btn-complete:hover::before {
+                opacity: 1;
+            }
+            
+            .btn-verify:disabled {
+                background: #475569;
+                cursor: not-allowed;
+                transform: none;
+                box-shadow: none;
+            }
+            
+            .btn-verify:disabled::before {
+                display: none;
+            }
+            
+            .auth-info {
+                margin-top: 32px;
+                padding: 20px;
+                background: rgba(30, 41, 59, 0.6);
+                border-radius: 12px;
+                border: 1px solid var(--border-color);
+                font-size: 13px;
+                color: var(--text-secondary);
+            }
+            
+            .auth-info p {
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .auth-info i {
+                color: var(--accent);
+            }
+            
+            .code-input-container {
+                margin-bottom: 24px;
+            }
+            
+            .code-inputs {
+                display: flex;
+                gap: 12px;
+                margin-top: 12px;
+                justify-content: center;
+            }
+            
+            .code-digit {
+                width: 56px;
+                height: 68px;
+                text-align: center;
+                font-size: 24px;
+                font-weight: 600;
+                background: rgba(30, 41, 59, 0.6);
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                color: var(--text-primary);
+                transition: all 0.2s;
+            }
+            
+            .code-digit:focus {
+                outline: none;
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                background: rgba(30, 41, 59, 0.8);
+            }
+            
+            .timer {
+                text-align: center;
+                margin: 24px 0;
+                padding: 16px;
+                color: var(--text-secondary);
+                font-size: 14px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                background: rgba(30, 41, 59, 0.6);
+                border-radius: 12px;
+                border: 1px solid var(--border-color);
+            }
+            
+            .btn-resend {
+                width: 100%;
+                padding: 16px;
+                background: rgba(30, 41, 59, 0.6);
+                color: var(--text-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+            }
+            
+            .btn-resend:hover {
+                background: rgba(30, 41, 59, 0.8);
+                border-color: var(--accent);
+                transform: translateY(-2px);
+            }
+            
+            .avatar-upload {
+                text-align: center;
+                margin-bottom: 32px;
+            }
+            
+            .avatar-preview {
+                width: 120px;
+                height: 120px;
+                margin: 0 auto 20px;
+                background: var(--primary-gradient);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 48px;
+                position: relative;
+                overflow: hidden;
+                cursor: pointer;
+                border: 4px solid rgba(59, 130, 246, 0.3);
+            }
+            
+            .avatar-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                transition: opacity 0.2s;
+                color: white;
+                font-size: 24px;
+            }
+            
+            .avatar-preview:hover .avatar-overlay {
+                opacity: 1;
+            }
+            
+            .btn-change-avatar {
+                background: none;
+                border: none;
+                color: var(--accent);
+                font-size: 14px;
+                cursor: pointer;
+                text-decoration: underline;
+                transition: color 0.2s;
+            }
+            
+            .btn-change-avatar:hover {
+                color: var(--accent-hover);
+            }
+            
+            .form-group {
+                margin-bottom: 20px;
+            }
+            
+            .form-group input {
+                width: 100%;
+                padding: 16px;
+                background: rgba(30, 41, 59, 0.6);
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                color: var(--text-primary);
+                font-size: 16px;
+                transition: all 0.2s;
+            }
+            
+            .form-group input:focus {
+                outline: none;
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                background: rgba(30, 41, 59, 0.8);
+            }
+            
+            .form-group input::placeholder {
+                color: var(--text-secondary);
+            }
+            
+            .username-input {
+                display: flex;
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                overflow: hidden;
+                background: rgba(30, 41, 59, 0.6);
+                transition: all 0.2s;
+            }
+            
+            .username-input:focus-within {
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            }
+            
+            .username-prefix {
+                padding: 16px;
+                background: rgba(30, 41, 59, 0.8);
+                color: var(--text-secondary);
+                font-weight: 500;
+                border-right: 1px solid var(--border-color);
+            }
+            
+            .username-input input {
+                flex: 1;
+                border: none;
+                background: transparent;
+                color: var(--text-primary);
+                padding: 16px;
+                font-size: 16px;
+                outline: none;
+            }
+            
+            .back-btn {
+                position: absolute;
+                left: 24px;
+                top: 24px;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.1);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+                border: none;
+            }
+            
+            .back-btn:hover {
+                background: rgba(255, 255, 255, 0.2);
+                transform: translateX(-2px);
+            }
+            
+            .decorative-dots {
+                position: absolute;
+                top: 24px;
+                right: 24px;
+                display: flex;
+                gap: 6px;
+            }
+            
+            .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.3);
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
