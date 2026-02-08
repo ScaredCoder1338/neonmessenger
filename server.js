@@ -1,7 +1,7 @@
 class NeoGram {
     constructor() {
         this.user = null;
-        this.currentStep = 'phone';
+        this.currentStep = 'phone'; // phone, code, profile
         this.timerInterval = null;
         this.timeLeft = 60;
         
@@ -14,9 +14,18 @@ class NeoGram {
         this.ws = null;
         this.wsConnected = false;
         
-        // API URL
-        this.apiUrl = 'http://localhost:3000/api';
-        this.wsUrl = 'ws://localhost:3000';
+        // API URL - автоматическое определение в зависимости от окружения
+        this.apiUrl = window.location.origin + '/api';
+        this.wsUrl = window.location.protocol === 'https:' ? 
+            `wss://${window.location.host}` : 
+            `ws://${window.location.host}`;
+        
+        // Аватарные цвета для разных пользователей
+        this.avatarColors = [
+            '#667eea', '#764ba2', '#f093fb', '#f5576c', 
+            '#4facfe', '#00f2fe', '#43e97b', '#38f9d7',
+            '#fa709a', '#fee140', '#a8edea', '#d299c2'
+        ];
         
         this.init();
     }
@@ -29,21 +38,31 @@ class NeoGram {
     }
     
     cacheElements() {
-        // Авторизация
+        // Шаги авторизации
         this.phoneStep = document.getElementById('phoneStep');
         this.codeStep = document.getElementById('codeStep');
         this.profileStep = document.getElementById('profileStep');
+        
+        // Поля ввода
         this.phoneNumber = document.getElementById('phoneNumber');
         this.codeDigits = document.querySelectorAll('.code-digit');
         this.firstName = document.getElementById('firstName');
         this.lastName = document.getElementById('lastName');
         this.username = document.getElementById('username');
         this.termsAgreement = document.getElementById('termsAgreement');
+        
+        // Кнопки
         this.sendCodeBtn = document.getElementById('sendCodeBtn');
         this.backToPhoneBtn = document.getElementById('backToPhone');
         this.verifyCodeBtn = document.getElementById('verifyCodeBtn');
         this.resendCodeBtn = document.getElementById('resendCodeBtn');
         this.completeProfileBtn = document.getElementById('completeProfileBtn');
+        this.changeAvatarBtn = document.getElementById('changeAvatarBtn');
+        this.avatarInput = document.getElementById('avatarInput');
+        
+        // Таймер
+        this.timerText = document.getElementById('timerText');
+        this.resendTimer = document.getElementById('resendTimer');
         
         // Основной интерфейс
         this.mainApp = document.getElementById('mainApp');
@@ -65,105 +84,395 @@ class NeoGram {
         this.messageInput = document.getElementById('messageInput');
         this.sendButton = document.getElementById('sendButton');
         
-        // Новый чат модальное окно
-        this.newChatModal = document.getElementById('newChatModal');
-        this.closeNewChatModalBtn = document.getElementById('closeNewChatModal');
-        this.cancelChatBtn = document.getElementById('cancelChatBtn');
-        this.createChatBtn = document.getElementById('createChatBtn');
-        this.contactUsername = document.getElementById('contactUsername');
-        this.groupName = document.getElementById('groupName');
-        this.chatTypeButtons = document.querySelectorAll('.chat-type-btn');
-        
         // Элементы информации
         this.chatTitle = document.getElementById('chatTitle');
         this.chatStatus = document.getElementById('chatStatus');
-        this.currentChatAvatar = document.getElementById('currentChatAvatar');
+        this.currentChatAvatar = document.querySelector('.chat-info .avatar');
         this.userDisplayName = document.getElementById('userDisplayName');
-        this.currentUsername = document.getElementById('currentUsername');
-        this.currentUserAvatar = document.getElementById('currentUserAvatar');
-        this.welcomePhone = document.getElementById('welcomePhone');
-        this.connectionStatusText = document.getElementById('connectionStatusText');
+        this.currentUsername = document.querySelector('.username');
+        this.currentUserAvatar = document.querySelector('.user-avatar');
+        this.connectionStatusText = document.querySelector('.connection-status span');
     }
     
     bindEvents() {
-        // Авторизация
+        // Шаг 1: Отправка кода
         this.sendCodeBtn.addEventListener('click', () => this.sendCode());
+        this.phoneNumber.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.sendCode();
+        });
+        
+        // Шаг 2: Ввод кода
         this.backToPhoneBtn.addEventListener('click', () => this.goToStep('phone'));
         this.verifyCodeBtn.addEventListener('click', () => this.verifyCode());
         this.resendCodeBtn.addEventListener('click', () => this.resendCode());
-        this.completeProfileBtn.addEventListener('click', () => this.completeProfile());
         
+        // Обработка ввода кода
         this.codeDigits.forEach((digit, index) => {
             digit.addEventListener('input', (e) => this.handleCodeInput(e, index));
+            digit.addEventListener('keydown', (e) => this.handleCodeNavigation(e, index));
+            digit.addEventListener('paste', (e) => this.handleCodePaste(e));
         });
         
-        // Основные кнопки
+        // Шаг 3: Профиль
+        this.completeProfileBtn.addEventListener('click', () => this.completeProfile());
+        this.changeAvatarBtn.addEventListener('click', () => this.avatarInput.click());
+        this.avatarInput.addEventListener('change', (e) => this.handleAvatarUpload(e));
+        
+        // Основной интерфейс
         this.logoutBtn.addEventListener('click', () => this.logout());
-        this.newChatBtn.addEventListener('click', () => this.openNewChatModal());
-        this.connectBtn.addEventListener('click', () => this.openNewChatModal());
+        this.newChatBtn.addEventListener('click', () => this.showNewChatModal());
+        this.connectBtn.addEventListener('click', () => this.showNewChatModal());
         
         // Сообщения
         this.sendButton.addEventListener('click', () => this.sendMessage());
         this.messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMessage();
-        });
-        
-        // Отправка статуса набора текста
-        this.messageInput.addEventListener('input', () => {
-            if (this.currentChatId && this.wsConnected) {
-                this.sendTypingStatus();
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
             }
         });
         
-        // Новый чат
-        this.closeNewChatModalBtn.addEventListener('click', () => this.closeNewChatModal());
-        this.cancelChatBtn.addEventListener('click', () => this.closeNewChatModal());
-        this.createChatBtn.addEventListener('click', () => this.createChat());
-        
-        // Переключение типа чата
-        this.chatTypeButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.chatTypeButtons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.updateNewChatForm(btn.dataset.type);
-            });
-        });
+        // Поиск
+        this.searchInput.addEventListener('input', () => this.filterChats());
     }
     
     setupPhoneInput() {
+        // Форматирование номера телефона
         this.phoneNumber.addEventListener('input', (e) => {
             let value = e.target.value.replace(/\D/g, '');
+            
+            // Форматирование: +7 (900) 123-45-67
             if (value.length > 0) {
                 value = value.substring(0, 10);
                 let formatted = '';
+                
                 if (value.length > 0) formatted = value.substring(0, 3);
                 if (value.length > 3) formatted = value.substring(0, 3) + ' ' + value.substring(3, 6);
                 if (value.length > 6) formatted = value.substring(0, 3) + ' ' + value.substring(3, 6) + ' ' + value.substring(6, 8);
                 if (value.length > 8) formatted = value.substring(0, 3) + ' ' + value.substring(3, 6) + ' ' + value.substring(6, 8) + ' ' + value.substring(8, 10);
+                
                 e.target.value = formatted;
             }
         });
     }
     
+    goToStep(step) {
+        this.currentStep = step;
+        
+        // Скрываем все шаги
+        this.phoneStep.classList.add('hidden');
+        this.codeStep.classList.add('hidden');
+        this.profileStep.classList.add('hidden');
+        
+        // Показываем нужный шаг
+        switch(step) {
+            case 'phone':
+                this.phoneStep.classList.remove('hidden');
+                this.phoneNumber.focus();
+                break;
+            case 'code':
+                this.codeStep.classList.remove('hidden');
+                this.codeDigits[0].focus();
+                this.startTimer();
+                break;
+            case 'profile':
+                this.profileStep.classList.remove('hidden');
+                this.firstName.focus();
+                break;
+        }
+    }
+    
+    validatePhone(phone) {
+        // Простая валидация российского номера
+        const cleanPhone = phone.replace(/\D/g, '');
+        return cleanPhone.length === 10 && cleanPhone.startsWith('9');
+    }
+    
+    sendCode() {
+        const phone = this.phoneNumber.value.trim();
+        
+        if (!this.termsAgreement.checked) {
+            alert('Пожалуйста, согласитесь с условиями использования');
+            return;
+        }
+        
+        if (!this.validatePhone(phone)) {
+            alert('Пожалуйста, введите корректный номер телефона (10 цифр, начинается с 9)');
+            return;
+        }
+        
+        // Сохраняем номер телефона
+        this.userPhone = this.formatPhoneForServer(phone);
+        
+        // Для демонстрации - показываем фиктивный запрос
+        console.log(`Отправка кода на номер: ${this.userPhone}`);
+        
+        // Обновляем текст с номером телефона
+        const formattedPhone = this.formatPhone(phone);
+        document.getElementById('codeSentTo').textContent = `Код отправлен на ${formattedPhone}`;
+        
+        // Переходим к шагу ввода кода
+        this.goToStep('code');
+        
+        // Для демонстрации - автоматически заполняем код
+        setTimeout(() => {
+            this.autoFillCode('12345');
+        }, 1000);
+    }
+    
+    formatPhoneForServer(phone) {
+        const clean = phone.replace(/\D/g, '');
+        return `+7${clean}`;
+    }
+    
+    formatPhone(phone) {
+        const clean = phone.replace(/\D/g, '');
+        return `+7 (${clean.substring(0,3)}) ${clean.substring(3,6)}-${clean.substring(6,8)}-${clean.substring(8,10)}`;
+    }
+    
+    handleCodeInput(e, index) {
+        const value = e.target.value;
+        
+        // Разрешаем только цифры
+        if (!/^\d?$/.test(value)) {
+            e.target.value = '';
+            return;
+        }
+        
+        // Автоматически переходим к следующему полю
+        if (value && index < this.codeDigits.length - 1) {
+            this.codeDigits[index + 1].focus();
+        }
+        
+        // Проверяем, заполнен ли весь код
+        this.checkCodeComplete();
+    }
+    
+    handleCodeNavigation(e, index) {
+        // Обработка Backspace
+        if (e.key === 'Backspace' && !e.target.value && index > 0) {
+            this.codeDigits[index - 1].focus();
+        }
+        // Обработка стрелок
+        else if (e.key === 'ArrowLeft' && index > 0) {
+            this.codeDigits[index - 1].focus();
+        }
+        else if (e.key === 'ArrowRight' && index < this.codeDigits.length - 1) {
+            this.codeDigits[index + 1].focus();
+        }
+    }
+    
+    handleCodePaste(e) {
+        e.preventDefault();
+        const pasteData = e.clipboardData.getData('text');
+        const digits = pasteData.replace(/\D/g, '').split('').slice(0, 5);
+        
+        digits.forEach((digit, index) => {
+            if (this.codeDigits[index]) {
+                this.codeDigits[index].value = digit;
+            }
+        });
+        
+        // Фокус на последнем заполненном поле
+        const lastIndex = Math.min(digits.length - 1, this.codeDigits.length - 1);
+        if (this.codeDigits[lastIndex]) {
+            this.codeDigits[lastIndex].focus();
+        }
+        
+        this.checkCodeComplete();
+    }
+    
+    autoFillCode(code) {
+        const digits = code.split('').slice(0, 5);
+        digits.forEach((digit, index) => {
+            if (this.codeDigits[index]) {
+                this.codeDigits[index].value = digit;
+            }
+        });
+        this.checkCodeComplete();
+    }
+    
+    checkCodeComplete() {
+        let complete = true;
+        let code = '';
+        
+        this.codeDigits.forEach(digit => {
+            if (!digit.value) complete = false;
+            code += digit.value;
+        });
+        
+        this.verifyCodeBtn.disabled = !complete;
+        return { complete, code };
+    }
+    
+    startTimer() {
+        this.timeLeft = 60;
+        this.resendTimer.classList.remove('hidden');
+        this.resendCodeBtn.classList.add('hidden');
+        
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+        }
+        
+        this.updateTimerDisplay();
+        
+        this.timerInterval = setInterval(() => {
+            this.timeLeft--;
+            this.updateTimerDisplay();
+            
+            if (this.timeLeft <= 0) {
+                clearInterval(this.timerInterval);
+                this.resendTimer.classList.add('hidden');
+                this.resendCodeBtn.classList.remove('hidden');
+            }
+        }, 1000);
+    }
+    
+    updateTimerDisplay() {
+        const minutes = Math.floor(this.timeLeft / 60);
+        const seconds = this.timeLeft % 60;
+        this.timerText.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    verifyCode() {
+        const { complete, code } = this.checkCodeComplete();
+        
+        if (!complete) {
+            alert('Пожалуйста, введите полный код');
+            return;
+        }
+        
+        // Для демонстрации считаем любой 5-значный код правильным
+        if (code.length === 5) {
+            // Останавливаем таймер
+            if (this.timerInterval) {
+                clearInterval(this.timerInterval);
+            }
+            
+            // Переходим к созданию профиля
+            this.goToStep('profile');
+        } else {
+            alert('Неверный код. Пожалуйста, проверьте и попробуйте снова.');
+        }
+    }
+    
+    resendCode() {
+        console.log('Повторная отправка кода');
+        this.startTimer();
+        
+        // Для демонстрации
+        setTimeout(() => {
+            this.autoFillCode('54321');
+        }, 1000);
+    }
+    
+    handleAvatarUpload(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const avatarPreview = document.getElementById('avatarPreview');
+                avatarPreview.innerHTML = '';
+                const img = document.createElement('img');
+                img.src = event.target.result;
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.borderRadius = '50%';
+                avatarPreview.appendChild(img);
+                
+                // Добавляем overlay обратно
+                const overlay = document.createElement('div');
+                overlay.className = 'avatar-overlay';
+                overlay.innerHTML = '<i class="fas fa-camera"></i>';
+                avatarPreview.appendChild(overlay);
+                
+                // Сохраняем аватар в localStorage
+                if (this.user) {
+                    this.user.avatar = event.target.result;
+                    localStorage.setItem('neogram_user', JSON.stringify(this.user));
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+    
+    async completeProfile() {
+        const firstName = this.firstName.value.trim();
+        const lastName = this.lastName.value.trim();
+        const username = this.username.value.trim().toLowerCase();
+        
+        if (!firstName) {
+            alert('Пожалуйста, введите ваше имя');
+            return;
+        }
+        
+        if (!this.validateUsername(username)) {
+            alert('Username должен содержать 3-20 символов (только буквы, цифры и подчеркивания)');
+            return;
+        }
+        
+        try {
+            // Регистрация через API
+            const response = await fetch(`${this.apiUrl}/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    phone: this.userPhone,
+                    firstName: firstName,
+                    lastName: lastName,
+                    username: username
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.user = data.user;
+                
+                // Сохраняем в localStorage
+                localStorage.setItem('neogram_user', JSON.stringify(this.user));
+                
+                // Показываем основной интерфейс
+                this.showMainInterface();
+                
+                // Подключаемся к WebSocket
+                this.connectWebSocket();
+                
+                // Загружаем чаты
+                await this.loadChats();
+            } else {
+                alert(data.error || 'Ошибка регистрации');
+            }
+        } catch (error) {
+            console.error('Ошибка регистрации:', error);
+            alert('Ошибка подключения к серверу');
+        }
+    }
+    
+    validateUsername(username) {
+        const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+        return usernameRegex.test(username);
+    }
+    
     // WebSocket соединение
     connectWebSocket() {
+        if (!this.user) return;
+        
         try {
             this.ws = new WebSocket(this.wsUrl);
             
             this.ws.onopen = () => {
                 console.log('WebSocket соединение установлено');
                 this.wsConnected = true;
+                this.updateConnectionStatus('connected', 'Подключено');
                 
                 // Авторизуемся через WebSocket
-                if (this.user) {
-                    this.ws.send(JSON.stringify({
-                        type: 'auth',
-                        username: this.user.username
-                    }));
-                }
-                
-                // Обновляем статус подключения
-                this.updateConnectionStatus('connected', 'Подключено');
+                this.ws.send(JSON.stringify({
+                    type: 'auth',
+                    username: this.user.username
+                }));
             };
             
             this.ws.onmessage = (event) => {
@@ -180,12 +489,12 @@ class NeoGram {
                 this.wsConnected = false;
                 this.updateConnectionStatus('disconnected', 'Отключено');
                 
-                // Пытаемся переподключиться через 3 секунды
+                // Пытаемся переподключиться через 5 секунд
                 setTimeout(() => {
-                    if (this.user) {
+                    if (this.user && !this.wsConnected) {
                         this.connectWebSocket();
                     }
-                }, 3000);
+                }, 5000);
             };
             
             this.ws.onerror = (error) => {
@@ -195,6 +504,7 @@ class NeoGram {
             
         } catch (error) {
             console.error('Ошибка создания WebSocket соединения:', error);
+            this.updateConnectionStatus('error', 'Ошибка подключения');
         }
     }
     
@@ -239,7 +549,16 @@ class NeoGram {
         // Проверяем, нет ли уже такого сообщения
         const exists = this.messages[message.chatId].some(m => m.id === message.id);
         if (!exists) {
-            this.messages[message.chatId].push(message);
+            const formattedMessage = {
+                ...message,
+                time: new Date(message.timestamp).toLocaleTimeString('ru-RU', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                }),
+                isOwn: message.sender === `@${this.user.username}`
+            };
+            
+            this.messages[message.chatId].push(formattedMessage);
             
             // Обновляем последнее сообщение в списке чатов
             const chatIndex = this.chats.findIndex(c => c.id === message.chatId);
@@ -248,7 +567,7 @@ class NeoGram {
                 this.chats[chatIndex].lastMessageTime = message.timestamp;
                 
                 // Увеличиваем счетчик непрочитанных, если чат не активен
-                if (message.chatId !== this.currentChatId && message.sender !== `@${this.user.username}`) {
+                if (message.chatId !== this.currentChatId && !formattedMessage.isOwn) {
                     this.chats[chatIndex].unreadCount = (this.chats[chatIndex].unreadCount || 0) + 1;
                 }
                 
@@ -257,24 +576,19 @@ class NeoGram {
             
             // Если чат активен, показываем сообщение
             if (message.chatId === this.currentChatId) {
-                const isOwn = message.sender === `@${this.user.username}`;
-                this.addMessageToChat({
-                    ...message,
-                    isOwn,
-                    time: new Date(message.timestamp).toLocaleTimeString('ru-RU', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                    })
-                });
+                this.addMessageToChat(formattedMessage);
                 
-                // Отправляем статус "прочитано" для своих сообщений
-                if (!isOwn && this.wsConnected) {
+                // Отправляем статус "прочитано" для чужих сообщений
+                if (!formattedMessage.isOwn && this.wsConnected) {
                     this.ws.send(JSON.stringify({
                         type: 'message_seen',
                         chatId: message.chatId,
                         messageId: message.id
                     }));
                 }
+                
+                // Прокручиваем вниз
+                this.scrollToBottom();
             }
         }
     }
@@ -283,14 +597,15 @@ class NeoGram {
         // Проверяем, нет ли уже такого чата
         const exists = this.chats.some(c => c.id === chat.id);
         if (!exists) {
-            this.chats.push({
+            const newChat = {
                 ...chat,
                 lastMessage: 'Нет сообщений',
                 lastMessageTime: chat.createdAt,
                 unreadCount: 0
-            });
+            };
             
-            this.addChatToList(chat);
+            this.chats.push(newChat);
+            this.addChatToList(newChat);
             
             // Если это первый чат, обновляем welcome screen
             if (this.chats.length === 1) {
@@ -303,23 +618,25 @@ class NeoGram {
         const indicator = document.querySelector('.status-indicator');
         const statusText = this.connectionStatusText;
         
-        indicator.className = 'status-indicator';
-        
-        switch (status) {
-            case 'connected':
-                indicator.classList.add('connected');
-                indicator.style.background = '#10b981';
-                break;
-            case 'connecting':
-                indicator.classList.add('connecting');
-                indicator.style.background = '#f59e0b';
-                break;
-            case 'disconnected':
-                indicator.style.background = '#ef4444';
-                break;
-            case 'error':
-                indicator.style.background = '#ef4444';
-                break;
+        if (indicator) {
+            indicator.className = 'status-indicator';
+            
+            switch (status) {
+                case 'connected':
+                    indicator.classList.add('connected');
+                    indicator.style.background = '#10b981';
+                    break;
+                case 'connecting':
+                    indicator.classList.add('connecting');
+                    indicator.style.background = '#f59e0b';
+                    break;
+                case 'disconnected':
+                    indicator.style.background = '#ef4444';
+                    break;
+                case 'error':
+                    indicator.style.background = '#ef4444';
+                    break;
+            }
         }
         
         if (statusText) {
@@ -330,25 +647,13 @@ class NeoGram {
     updateUserStatus(username, status) {
         // Обновляем статус в списке чатов
         this.chats.forEach(chat => {
-            if (chat.members.includes(`@${username}`)) {
+            if (chat.members && chat.members.includes(username)) {
                 const chatElement = document.querySelector(`.chat-item[data-chat-id="${chat.id}"]`);
                 if (chatElement) {
-                    const statusElement = chatElement.querySelector('.chat-status');
-                    if (statusElement) {
-                        statusElement.textContent = status === 'online' ? 'online' : 
-                            `был(а) ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
-                    }
+                    // Можно добавить отображение статуса в будущем
                 }
             }
         });
-        
-        // Если это текущий чат, обновляем статус в заголовке
-        if (this.currentChatId) {
-            const currentChat = this.chats.find(c => c.id === this.currentChatId);
-            if (currentChat && currentChat.members.includes(`@${username}`)) {
-                this.updateChatStatus();
-            }
-        }
     }
     
     showTypingIndicator(chatId, username) {
@@ -381,15 +686,6 @@ class NeoGram {
         }
     }
     
-    sendTypingStatus() {
-        if (this.wsConnected && this.currentChatId) {
-            this.ws.send(JSON.stringify({
-                type: 'typing',
-                chatId: this.currentChatId
-            }));
-        }
-    }
-    
     updateMessageStatus(chatId, messageId, seenBy, seenAt) {
         if (this.messages[chatId]) {
             const message = this.messages[chatId].find(m => m.id === messageId);
@@ -410,70 +706,21 @@ class NeoGram {
         }
     }
     
-    // Авторизация (остается без изменений, только добавляем вызов API)
-    async completeProfile() {
-        const firstName = this.firstName.value.trim();
-        const lastName = this.lastName.value.trim();
-        const username = this.username.value.trim();
-        const phone = this.userPhone;
-        
-        if (!firstName) {
-            alert('Пожалуйста, введите ваше имя');
-            return;
-        }
-        
-        if (!this.validateUsername(username)) {
-            alert('Username должен содержать 3-20 символов (только буквы, цифры и подчеркивания)');
-            return;
-        }
-        
-        try {
-            // Регистрация через API
-            const response = await fetch(`${this.apiUrl}/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    phone,
-                    firstName,
-                    lastName,
-                    username: username.toLowerCase()
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.user = data.user;
-                
-                // Сохраняем в localStorage
-                localStorage.setItem('neogram_user', JSON.stringify(this.user));
-                
-                // Показываем основной интерфейс
-                this.showMainInterface();
-                
-                // Подключаемся к WebSocket
-                this.connectWebSocket();
-                
-                // Загружаем чаты
-                this.loadChats();
-            } else {
-                alert(data.error || 'Ошибка регистрации');
-            }
-        } catch (error) {
-            console.error('Ошибка регистрации:', error);
-            alert('Ошибка подключения к серверу');
-        }
-    }
-    
     async loadChats() {
+        if (!this.user) return;
+        
         try {
             const response = await fetch(`${this.apiUrl}/chats/${this.user.username}`);
             const data = await response.json();
             
             if (data.success) {
-                this.chats = data.chats;
+                this.chats = data.chats.map(chat => ({
+                    ...chat,
+                    lastMessage: 'Нет сообщений',
+                    lastMessageTime: chat.createdAt,
+                    unreadCount: 0
+                }));
+                
                 this.renderChatsList();
                 
                 // Загружаем сообщения для каждого чата
@@ -506,9 +753,81 @@ class NeoGram {
         }
     }
     
+    renderChatsList() {
+        this.chatsList.innerHTML = '';
+        
+        this.chats.forEach(chat => {
+            this.addChatToList(chat);
+        });
+        
+        this.updateWelcomeScreen();
+    }
+    
+    addChatToList(chat) {
+        const chatElement = document.createElement('div');
+        chatElement.className = 'chat-item';
+        chatElement.dataset.chatId = chat.id;
+        
+        const lastMessageTime = chat.lastMessageTime ? 
+            new Date(chat.lastMessageTime).toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : '--:--';
+        
+        chatElement.innerHTML = `
+            <div class="chat-avatar" style="background: ${chat.avatarColor || '#667eea'}">
+                <i class="${chat.type === 'group' ? 'fas fa-user-friends' : 'fas fa-user'}"></i>
+            </div>
+            <div class="chat-info">
+                <div class="chat-header">
+                    <h4>${chat.name}</h4>
+                    <span class="chat-time">${lastMessageTime}</span>
+                </div>
+                <div class="chat-preview">
+                    <p>${chat.lastMessage || 'Нет сообщений'}</p>
+                    ${chat.unreadCount > 0 ? `<span class="unread-count">${chat.unreadCount}</span>` : ''}
+                </div>
+            </div>
+        `;
+        
+        chatElement.addEventListener('click', () => this.selectChat(chat.id));
+        this.chatsList.appendChild(chatElement);
+    }
+    
+    updateChatInList(chatId) {
+        const chat = this.chats.find(c => c.id === chatId);
+        if (!chat) return;
+        
+        const chatElement = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+        if (!chatElement) return;
+        
+        const lastMessageTime = chat.lastMessageTime ? 
+            new Date(chat.lastMessageTime).toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : '--:--';
+        
+        chatElement.querySelector('.chat-time').textContent = lastMessageTime;
+        chatElement.querySelector('.chat-preview p').textContent = chat.lastMessage || 'Нет сообщений';
+        
+        const unreadCountElement = chatElement.querySelector('.unread-count');
+        if (chat.unreadCount > 0) {
+            if (!unreadCountElement) {
+                const unreadSpan = document.createElement('span');
+                unreadSpan.className = 'unread-count';
+                unreadSpan.textContent = chat.unreadCount;
+                chatElement.querySelector('.chat-preview').appendChild(unreadSpan);
+            } else {
+                unreadCountElement.textContent = chat.unreadCount;
+            }
+        } else if (unreadCountElement) {
+            unreadCountElement.remove();
+        }
+    }
+    
     async sendMessage() {
         const text = this.messageInput.value.trim();
-        if (!text || !this.currentChatId || !this.user) return;
+        if (!text || !this.currentChatId || !this.user || !this.wsConnected) return;
         
         try {
             const response = await fetch(`${this.apiUrl}/messages/send`, {
@@ -538,171 +857,6 @@ class NeoGram {
         }
     }
     
-    async createChat() {
-        const activeType = document.querySelector('.chat-type-btn.active').dataset.type;
-        
-        if (activeType === 'private') {
-            await this.createPrivateChat();
-        } else {
-            await this.createGroupChat();
-        }
-    }
-    
-    async createPrivateChat() {
-        const username = this.contactUsername.value.trim().replace('@', '');
-        
-        if (!username) {
-            alert('Пожалуйста, введите username');
-            return;
-        }
-        
-        if (!this.validateUsername(username)) {
-            alert('Некорректный username. Используйте только буквы, цифры и подчеркивания (3-20 символов)');
-            return;
-        }
-        
-        if (username === this.user.username) {
-            alert('Нельзя создать чат с самим собой');
-            return;
-        }
-        
-        try {
-            // Сначала проверяем существование пользователя
-            const userResponse = await fetch(`${this.apiUrl}/user/${username}`);
-            const userData = await userResponse.json();
-            
-            if (!userData.success) {
-                alert('Пользователь не найден');
-                return;
-            }
-            
-            // Создаем чат
-            const response = await fetch(`${this.apiUrl}/chats/create`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    type: 'private',
-                    name: `@${username}`,
-                    members: [`@${username}`],
-                    creator: this.user.username
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.closeNewChatModal();
-                
-                // Добавляем чат в список
-                this.handleNewChat({
-                    ...data.chat,
-                    lastMessage: 'Нет сообщений',
-                    lastMessageTime: data.chat.createdAt,
-                    unreadCount: 0
-                });
-                
-                // Выбираем созданный чат
-                this.selectChat(data.chat.id);
-            } else {
-                alert(data.error || 'Ошибка создания чата');
-            }
-        } catch (error) {
-            console.error('Ошибка создания чата:', error);
-            alert('Ошибка подключения к серверу');
-        }
-    }
-    
-    async createGroupChat() {
-        const groupName = this.groupName.value.trim();
-        
-        if (!groupName) {
-            alert('Пожалуйста, введите название группы');
-            return;
-        }
-        
-        try {
-            const response = await fetch(`${this.apiUrl}/chats/create`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    type: 'group',
-                    name: groupName,
-                    members: [],
-                    creator: this.user.username
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.closeNewChatModal();
-                
-                // Добавляем чат в список
-                this.handleNewChat({
-                    ...data.chat,
-                    lastMessage: 'Нет сообщений',
-                    lastMessageTime: data.chat.createdAt,
-                    unreadCount: 0
-                });
-                
-                // Выбираем созданный чат
-                this.selectChat(data.chat.id);
-            } else {
-                alert(data.error || 'Ошибка создания чата');
-            }
-        } catch (error) {
-            console.error('Ошибка создания группы:', error);
-            alert('Ошибка подключения к серверу');
-        }
-    }
-    
-    // Остальные методы остаются аналогичными предыдущей версии,
-    // но используют данные из API вместо демо-данных
-    
-    renderChatsList() {
-        this.chatsList.innerHTML = '';
-        
-        this.chats.forEach(chat => {
-            this.addChatToList(chat);
-        });
-        
-        this.updateWelcomeScreen();
-    }
-    
-    addChatToList(chat) {
-        const chatElement = document.createElement('div');
-        chatElement.className = 'chat-item';
-        chatElement.dataset.chatId = chat.id;
-        
-        const lastMessageTime = new Date(chat.lastMessageTime).toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        
-        chatElement.innerHTML = `
-            <div class="chat-avatar" style="background: ${chat.avatarColor || '#667eea'}">
-                <i class="${chat.type === 'group' ? 'fas fa-user-friends' : 'fas fa-user'}"></i>
-            </div>
-            <div class="chat-info">
-                <div class="chat-header">
-                    <h4>${chat.name}</h4>
-                    <span class="chat-time">${lastMessageTime}</span>
-                </div>
-                <div class="chat-preview">
-                    <p>${chat.lastMessage || 'Нет сообщений'}</p>
-                    ${chat.unreadCount > 0 ? `<span class="unread-count">${chat.unreadCount}</span>` : ''}
-                </div>
-            </div>
-        `;
-        
-        chatElement.addEventListener('click', () => this.selectChat(chat.id));
-        this.chatsList.appendChild(chatElement);
-    }
-    
     selectChat(chatId) {
         const chat = this.chats.find(c => c.id === chatId);
         if (!chat) return;
@@ -725,8 +879,10 @@ class NeoGram {
         this.updateChatStatus();
         
         // Устанавливаем аватар чата
-        this.currentChatAvatar.style.background = chat.avatarColor || '#667eea';
-        this.currentChatAvatar.innerHTML = `<i class="${chat.type === 'group' ? 'fas fa-user-friends' : 'fas fa-user'}"></i>`;
+        if (this.currentChatAvatar) {
+            this.currentChatAvatar.style.background = chat.avatarColor || '#667eea';
+            this.currentChatAvatar.innerHTML = `<i class="${chat.type === 'group' ? 'fas fa-user-friends' : 'fas fa-user'}"></i>`;
+        }
         
         // Показываем сообщения
         this.showChatMessages(chatId);
@@ -749,12 +905,11 @@ class NeoGram {
         const chat = this.chats.find(c => c.id === this.currentChatId);
         if (!chat) return;
         
-        const onlineMembers = chat.members.filter(member => {
-            // В реальном приложении здесь нужно проверять статус пользователей
-            return member === `@${this.user.username}`; // Пока только себя считаем онлайн
-        }).length;
-        
-        this.chatStatus.textContent = `${chat.members.length} участников, ${onlineMembers} онлайн`;
+        if (chat.type === 'private') {
+            this.chatStatus.textContent = 'online';
+        } else {
+            this.chatStatus.textContent = `${chat.members ? chat.members.length : 1} участников`;
+        }
     }
     
     showChatMessages(chatId) {
@@ -810,15 +965,19 @@ class NeoGram {
         messageElement.className = `message ${message.isOwn ? 'outgoing' : 'incoming'}`;
         messageElement.dataset.messageId = message.id;
         
+        // Определяем цвет аватара на основе имени отправителя
+        const senderName = message.sender.replace('@', '');
+        const avatarColor = this.getAvatarColor(senderName);
+        
         messageElement.innerHTML = `
             ${!message.isOwn ? `
-                <div class="message-avatar" style="background: #764ba2">
+                <div class="message-avatar" style="background: ${avatarColor}">
                     <i class="fas fa-user"></i>
                 </div>
             ` : ''}
             <div class="message-content">
                 ${!message.isOwn ? `<span class="message-sender">${message.sender}</span>` : ''}
-                <div class="message-text">${message.text}</div>
+                <div class="message-text">${this.escapeHtml(message.text)}</div>
                 <div class="message-time">${message.time}</div>
                 ${message.isOwn ? `
                     <div class="message-status">
@@ -838,16 +997,72 @@ class NeoGram {
         }
     }
     
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    scrollToBottom() {
+        setTimeout(() => {
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }, 100);
+    }
+    
+    resetUnreadCount(chatId) {
+        const chatIndex = this.chats.findIndex(c => c.id === chatId);
+        if (chatIndex !== -1 && this.chats[chatIndex].unreadCount > 0) {
+            this.chats[chatIndex].unreadCount = 0;
+            this.updateChatInList(chatId);
+        }
+    }
+    
     updateWelcomeScreen() {
         if (this.chats.length > 0) {
-            document.querySelector('.welcome-screen p:nth-child(3)').textContent = 
-                'Выберите чат из списка слева, чтобы начать общение';
+            const welcomeText = document.querySelector('.welcome-screen p:nth-child(3)');
+            if (welcomeText) {
+                welcomeText.textContent = 'Выберите чат из списка слева, чтобы начать общение';
+            }
             this.connectBtn.innerHTML = '<i class="fas fa-plus"></i> Создать чат';
         }
     }
     
-    // Остальные методы (goToStep, validatePhone, sendCode, verifyCode, etc.)
-    // остаются такими же как в предыдущей версии, но с добавлением вызовов API
+    showNewChatModal() {
+        alert('Функция создания нового чата будет реализована в следующей версии');
+        // В будущем можно добавить модальное окно для создания чата
+    }
+    
+    filterChats() {
+        const searchTerm = this.searchInput.value.toLowerCase();
+        
+        document.querySelectorAll('.chat-item').forEach(chatItem => {
+            const chatName = chatItem.querySelector('h4').textContent.toLowerCase();
+            const chatPreview = chatItem.querySelector('.chat-preview p').textContent.toLowerCase();
+            
+            if (chatName.includes(searchTerm) || chatPreview.includes(searchTerm)) {
+                chatItem.style.display = 'flex';
+            } else {
+                chatItem.style.display = 'none';
+            }
+        });
+    }
+    
+    getAvatarColor(username) {
+        // Генерируем индекс цвета на основе имени пользователя
+        let hash = 0;
+        for (let i = 0; i < username.length; i++) {
+            hash = username.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const index = Math.abs(hash) % this.avatarColors.length;
+        return this.avatarColors[index];
+    }
+    
+    setAvatarColor(element, username) {
+        if (element && username) {
+            const color = this.getAvatarColor(username);
+            element.style.background = color;
+        }
+    }
     
     checkSession() {
         const savedUser = localStorage.getItem('neogram_user');
@@ -859,7 +1074,7 @@ class NeoGram {
                 fetch(`${this.apiUrl}/user/${this.user.username}`)
                     .then(response => response.json())
                     .then(data => {
-                        if (data.success) {
+                        if (data.success && data.user) {
                             this.showMainInterface();
                             this.connectWebSocket();
                             this.loadChats();
@@ -879,14 +1094,33 @@ class NeoGram {
         }
     }
     
+    showAuth() {
+        document.body.className = 'auth-visible';
+        this.phoneNumber.focus();
+        this.goToStep('phone');
+    }
+    
     showMainInterface() {
         document.body.className = 'app-visible';
         
         if (this.user) {
+            // Обновляем информацию о пользователе
             this.userDisplayName.textContent = this.user.displayName;
             this.currentUsername.textContent = `@${this.user.username}`;
-            this.welcomePhone.textContent = this.formatPhone(this.user.phone);
             
+            // Обновляем welcome screen
+            const welcomeTitle = document.querySelector('.welcome-screen h2');
+            const welcomePhone = document.querySelector('.welcome-screen strong');
+            
+            if (welcomeTitle) {
+                welcomeTitle.textContent = `Добро пожаловать, ${this.user.firstName}!`;
+            }
+            
+            if (welcomePhone && this.user.phone) {
+                welcomePhone.textContent = this.user.phone;
+            }
+            
+            // Устанавливаем аватар
             this.setAvatarColor(this.currentUserAvatar, this.user.username);
             
             this.updateConnectionStatus('connecting', 'Подключение к серверу...');

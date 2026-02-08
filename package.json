@@ -1,7 +1,7 @@
 {
-  "name": "telegram-web",
+  "name": "neogram-messenger",
   "version": "1.0.0",
-  "description": "Telegram Web Prototype with real-time messaging",
+  "description": "Modern Telegram-like messenger",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
